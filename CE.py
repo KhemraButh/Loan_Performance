@@ -16,10 +16,24 @@ st.set_page_config(
 # Initialize connection
 #@st.cache_resource
 def connect_to_google_sheets():
-    """Connect to Google Sheets"""
+    """Connect to Google Sheets using Streamlit secrets"""
     try:
-        creds = Credentials.from_service_account_file(
-            "/Users/thekhemfee/Downloads/service_account.json",
+        # Get service account info from Streamlit secrets
+        service_account_info = {
+            "type": st.secrets["gcp"]["type"],
+            "project_id": st.secrets["gcp"]["project_id"],
+            "private_key_id": st.secrets["gcp"]["private_key_id"],
+            "private_key": st.secrets["gcp"]["private_key"],
+            "client_email": st.secrets["gcp"]["client_email"],
+            "client_id": st.secrets["gcp"]["client_id"],
+            "auth_uri": st.secrets["gcp"]["auth_uri"],
+            "token_uri": st.secrets["gcp"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gcp"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gcp"]["client_x509_cert_url"]
+        }
+        
+        creds = Credentials.from_service_account_info(
+            service_account_info,
             scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
         client = gspread.authorize(creds)
@@ -29,7 +43,7 @@ def connect_to_google_sheets():
         return None
 
 # Load data
-#@st.cache_data(ttl=300)
+@st.cache_data(ttl=3600)
 def load_data():
     """Load data from Google Sheets"""
     try:
@@ -37,7 +51,9 @@ def load_data():
         if not client:
             return None
         
-        sheet = client.open_by_key("1wM7DTHizhg_A3h0qV3EhX4os4hk46uolW-ESQSJkgZs")
+        sheet_id = st.secrets["sheets"]["sheet_id"]
+        sheet = client.open_by_key(sheet_id)
+        #sheet = client.open_by_key("1wM7DTHizhg_A3h0qV3EhX4os4hk46uolW-ESQSJkgZs")
         
         # Load main data
         worksheet = sheet.worksheet("Sheet2")
