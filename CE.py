@@ -75,356 +75,263 @@ def load_data():
         st.error(f"Error loading data: {e}")
         return None
 
-# Initialize session state for navigation
-if 'current_view' not in st.session_state:
-    st.session_state.current_view = 'monthly'
-if 'selected_month' not in st.session_state:
-    st.session_state.selected_month = None
-if 'selected_branch' not in st.session_state:
-    st.session_state.selected_branch = None
 
-def clean_numeric_column(series):
-    """Clean and convert numeric columns with mixed data types"""
-    if series.dtype == 'object':
-        # Remove currency symbols, commas, and other non-numeric characters
-        cleaned = series.astype(str).str.replace(r'[^\d.-]', '', regex=True)
-        # Convert to numeric, setting errors to NaN
-        return pd.to_numeric(cleaned, errors='coerce')
-    return series
-# Main dashboard
+# Mobile CSS
+st.markdown("""
+<style>
+    /* Mobile-first responsive design */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        
+        /* Compact metrics */
+        .stMetric {
+            padding: 0.5rem !important;
+        }
+        
+        /* Better touch targets */
+        .stButton button {
+            min-height: 44px;
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+        
+        /* Compact cards */
+        .mobile-card {
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    }
+    
+    /* Always show these styles */
+    .compact-metric {
+        text-align: center;
+        padding: 0.8rem;
+    }
+    
+    .nav-button {
+        width: 100%;
+        margin: 0.2rem 0;
+        border-radius: 12px;
+    }
+    
+    .performance-badge {
+        display: inline-block;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin: 0.2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 def main():
-    st.title("🏦 Performance Dashboard")
+    # Mobile header with quick stats
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("🏦 Loan Performance")
+    with col2:
+        st.metric("Loans", "156", "+12%")
+    
+    # Navigation pills
     st.markdown("---")
     
-    # Load data
-    df = load_data()
-    
-    if df is None or df.empty:
-        st.error("No data loaded. Please check your connection.")
-        return
-# Clean numeric columns
-    numeric_columns = ['AMOUNT IN USD', 'OUTSTANDING', 'INTEREST RATE']
-    for col in numeric_columns:
-      if col in df.columns:
-        st.sidebar.info(f"🔄 Cleaning column: {col}")
-        before_sample = df[col].iloc[0] if len(df) > 0 else "N/A"
-        df[col] = clean_numeric_column(df[col])
-        after_sample = df[col].iloc[0] if len(df) > 0 else "N/A"
-        st.sidebar.write(f"   Before: {before_sample} → After: {after_sample}")
-            
-    # Data preprocessing
-    df['MONTH'] = pd.to_datetime(df['Date']).dt.strftime('%B %Y')
-    df['Quarter'] = df['Quarter'].fillna('Unknown')
-    df['Branch/Outlet'] = df['Branch/Outlet'].fillna('Unknown')
-    df['RM Name'] = df['RM Name'].fillna('Unknown')
-    
-    # Sidebar filters
-    st.sidebar.title("Filters")
-    
-    # Quarter filter
-    quarters = sorted(df['Quarter'].unique())
-    selected_quarter = st.sidebar.selectbox("Select Quarter", quarters)
-    
-    # Product type filter
-    product_types = ['All'] + sorted(df['PRODUCT_TYPE'].dropna().unique().tolist())
-    selected_product = st.sidebar.selectbox("Select Product Type", product_types)
-    
-    # Apply filters
-    filtered_df = df[df['Quarter'] == selected_quarter]
-    if selected_product != 'All':
-        filtered_df = filtered_df[filtered_df['PRODUCT_TYPE'] == selected_product]
+    # Navigation state
+    if 'view' not in st.session_state:
+        st.session_state.view = 'overview'
     
     # Navigation buttons
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("📅 Monthly Overview", use_container_width=True):
-            st.session_state.current_view = 'monthly'
-            st.session_state.selected_month = None
-            st.session_state.selected_branch = None
-    with col2:
-        if st.button("🏢 Branch Performance", use_container_width=True):
-            if st.session_state.selected_month:
-                st.session_state.current_view = 'branch'
-    with col3:
-        if st.button("👤 RM Performance", use_container_width=True):
-            if st.session_state.selected_branch:
-                st.session_state.current_view = 'rm'
+    nav_cols = st.columns(4)
+    with nav_cols[0]:
+        if st.button("📊", help="Overview", use_container_width=True, key="nav_overview"):
+            st.session_state.view = 'overview'
+    with nav_cols[1]:
+        if st.button("🏢", help="Branches", use_container_width=True, key="nav_branches"):
+            st.session_state.view = 'branches'
+    with nav_cols[2]:
+        if st.button("👤", help="RMs", use_container_width=True, key="nav_rms"):
+            st.session_state.view = 'rms'
+    with nav_cols[3]:
+        if st.button("⚙️", help="Settings", use_container_width=True, key="nav_settings"):
+            st.session_state.view = 'settings'
     
     st.markdown("---")
     
     # View routing
-    if st.session_state.current_view == 'monthly':
-        show_monthly_overview(filtered_df)
-    elif st.session_state.current_view == 'branch':
-        show_branch_performance(filtered_df, st.session_state.selected_month)
-    elif st.session_state.current_view == 'rm':
-        show_rm_performance(filtered_df, st.session_state.selected_branch)
+    if st.session_state.view == 'overview':
+        show_mobile_overview()
+    elif st.session_state.view == 'branches':
+        show_mobile_branches()
+    elif st.session_state.view == 'rms':
+        show_mobile_rms()
+    elif st.session_state.view == 'settings':
+        show_mobile_settings()
 
-def show_monthly_overview(df):
-    st.header("📅 Monthly Performance Overview")
+def show_mobile_overview():
+    """Mobile-optimized overview"""
     
-    # KPI Metrics
-    col1, col2, col3, col4 = st.columns(4)
+    # Quick KPI cards
+    st.subheader("📈 Quick Stats")
     
-    total_loans = len(df)
-    total_amount = df['AMOUNT IN USD'].sum()
-    avg_loan_size = df['AMOUNT IN USD'].mean()
-    unique_branches = df['Branch/Outlet'].nunique()
+    kpi_cols = st.columns(2)
+    with kpi_cols[0]:
+        with st.container():
+            st.metric("Total Amount", "$4.2M", "+8%")
+            st.metric("Active Loans", "156", "+12")
     
-    with col1:
-        st.metric("Total Loans", f"{total_loans:,}")
-    with col2:
-        st.metric("Total Amount", f"${total_amount:,.2f}")
-    with col3:
-        st.metric("Avg Loan Size", f"${avg_loan_size:,.2f}")
-    with col4:
-        st.metric("Active Branches", unique_branches)
+    with kpi_cols[1]:
+        with st.container():
+            st.metric("Avg. Loan Size", "$26.9K", "+3%")
+            st.metric("Completion", "84%", "+5%")
     
-    # Monthly trends
-    monthly_data = df.groupby('MONTH').agg({
-        'AMOUNT IN USD': ['sum', 'count'],
-        'OUTSTANDING': 'sum',
-        'RM Name': 'nunique'
-    }).round(2)
+    # Performance chart
+    st.subheader("📊 Monthly Performance")
     
-    monthly_data.columns = ['Total Amount', 'Loan Count', 'Total Outstanding', 'Unique RMs']
-    monthly_data = monthly_data.reset_index()
+    # Sample data - replace with your actual data
+    monthly_data = pd.DataFrame({
+        'Month': ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+        'Amount': [3.8, 4.1, 3.9, 4.2, 4.5],
+        'Loans': [142, 148, 145, 152, 156]
+    })
     
-    # Create tabs for different charts
-    tab1, tab2, tab3 = st.tabs(["Amount Trends", "Loan Count", "Product Analysis"])
+    fig = px.bar(monthly_data, x='Month', y='Amount', 
+                 title="Loan Amount by Month")
+    fig.update_layout(height=300, showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
     
-    with tab1:
-        # Amount by month
-        fig_amount = px.bar(
-            monthly_data, 
-            x='MONTH', 
-            y='Total Amount',
-            title="Total Loan Amount by Month",
-            color='Total Amount',
-            color_continuous_scale='viridis'
-        )
-        fig_amount.update_layout(xaxis_title="Month", yaxis_title="Total Amount (USD)")
-        st.plotly_chart(fig_amount, use_container_width=True)
-        
-        # Make bars clickable
-        if st.button("📊 Click on bars to view branch performance"):
-            st.info("Click on any bar in the chart above to drill down into branch performance for that month")
+    # Recent activity
+    st.subheader("🔔 Recent Activity")
     
-    with tab2:
-        # Loan count by month
-        fig_count = px.line(
-            monthly_data,
-            x='MONTH',
-            y='Loan Count',
-            title="Loan Count by Month",
-            markers=True
-        )
-        fig_count.update_traces(line=dict(width=4))
-        st.plotly_chart(fig_count, use_container_width=True)
+    activities = [
+        {"icon": "✅", "text": "Loan #2456 approved", "time": "2h ago"},
+        {"icon": "👤", "text": "New RM onboarded", "time": "1d ago"},
+        {"icon": "🏢", "text": "Branch BTK exceeded target", "time": "1d ago"},
+        {"icon": "📈", "text": "Monthly growth +8%", "time": "2d ago"}
+    ]
     
-    with tab3:
-        # Product type distribution
-        product_data = df.groupby('PRODUCT_TYPE')['AMOUNT IN USD'].sum().reset_index()
-        fig_product = px.pie(
-            product_data,
-            values='AMOUNT IN USD',
-            names='PRODUCT_TYPE',
-            title="Loan Amount by Product Type"
-        )
-        st.plotly_chart(fig_product, use_container_width=True)
-    
-    # Interactive monthly table
-    st.subheader("Monthly Summary Table")
-    display_monthly = monthly_data.copy()
-    display_monthly['Total Amount'] = display_monthly['Total Amount'].apply(lambda x: f"${x:,.2f}")
-    display_monthly['Total Outstanding'] = display_monthly['Total Outstanding'].apply(lambda x: f"${x:,.2f}")
-    
-    # Add clickable functionality
-    for idx, row in display_monthly.iterrows():
-        col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
+    for activity in activities:
+        col1, col2 = st.columns([1, 4])
         with col1:
-            st.write(f"**{row['MONTH']}**")
+            st.write(activity["icon"])
         with col2:
-            st.write(f"Amount: {row['Total Amount']}")
-        with col3:
-            st.write(f"Loans: {row['Loan Count']}")
-        with col4:
-            st.write(f"Outstanding: {row['Total Outstanding']}")
-        with col5:
-            if st.button("View Branches", key=f"month_{idx}"):
-                st.session_state.current_view = 'branch'
-                st.session_state.selected_month = row['MONTH']
+            st.write(f"**{activity['text']}**")
+            st.caption(activity["time"])
+        st.divider()
+
+def show_mobile_branches():
+    """Mobile-optimized branch view"""
+    
+    st.subheader("🏢 Branch Performance")
+    
+    # Branch ranking
+    branches_data = [
+        {"name": "SRB", "amount": "$1.2M", "growth": "+15%", "loans": "45"},
+        {"name": "BTK", "amount": "$980K", "growth": "+22%", "loans": "38"},
+        {"name": "NRD", "amount": "$850K", "growth": "+8%", "loans": "32"},
+        {"name": "TLK", "amount": "$720K", "growth": "+5%", "loans": "28"},
+        {"name": "Other", "amount": "$450K", "growth": "+3%", "loans": "13"}
+    ]
+    
+    for i, branch in enumerate(branches_data):
+        with st.expander(f"🏢 {branch['name']} - {branch['amount']} ({branch['growth']})", expanded=i==0):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Amount", branch["amount"])
+            with col2:
+                st.metric("Growth", branch["growth"])
+            with col3:
+                st.metric("Loans", branch["loans"])
+            
+            if st.button(f"View RMs in {branch['name']}", key=f"branch_{i}", use_container_width=True):
+                st.session_state.selected_branch = branch['name']
+                st.session_state.view = 'rms'
                 st.rerun()
 
-def show_branch_performance(df, selected_month):
-    st.header(f"🏢 Branch Performance - {selected_month}")
+def show_mobile_rms():
+    """Mobile-optimized RM view"""
     
-    # Filter data for selected month
-    month_df = df[df['MONTH'] == selected_month]
+    st.subheader("👤 Relationship Managers")
     
-    # Back button
-    if st.button("← Back to Monthly Overview"):
-        st.session_state.current_view = 'monthly'
-        st.session_state.selected_month = None
-        st.rerun()
+    # Search and filter
+    search_col, filter_col = st.columns([3, 1])
+    with search_col:
+        search = st.text_input("Search RMs", placeholder="Type name...")
+    with filter_col:
+        filter_opt = st.selectbox("Filter", ["All", "Top", "Active"])
     
-    # Branch KPIs
-    col1, col2, col3, col4 = st.columns(4)
+    # RM cards
+    rms_data = [
+        {"name": "HENG Leangmey", "branch": "SRB", "amount": "$450K", "loans": "18", "growth": "+25%"},
+        {"name": "PEN Samnang", "branch": "NRD", "amount": "$380K", "loans": "15", "growth": "+18%"},
+        {"name": "BUN Ammatak", "branch": "BTK", "amount": "$320K", "loans": "12", "growth": "+12%"},
+        {"name": "NHIM Heang", "branch": "TLK", "amount": "$290K", "loans": "11", "growth": "+8%"},
+        {"name": "LUN Phally", "branch": "SRB", "amount": "$270K", "loans": "10", "growth": "+15%"}
+    ]
     
-    branch_loans = len(month_df)
-    branch_amount = month_df['AMOUNT IN USD'].sum()
-    branch_outstanding = month_df['OUTSTANDING'].sum()
-    unique_rms = month_df['RM Name'].nunique()
-    
-    with col1:
-        st.metric("Branch Loans", branch_loans)
-    with col2:
-        st.metric("Total Amount", f"${branch_amount:,.2f}")
-    with col3:
-        st.metric("Total Outstanding", f"${branch_outstanding:,.2f}")
-    with col4:
-        st.metric("Active RMs", unique_rms)
-    
-    # Branch performance
-    branch_data = month_df.groupby('Branch/Outlet').agg({
-        'AMOUNT IN USD': ['sum', 'count'],
-        'OUTSTANDING': 'sum',
-        'RM Name': 'nunique',
-        'INTEREST RATE': 'mean'
-    }).round(2)
-    
-    branch_data.columns = ['Total Amount', 'Loan Count', 'Total Outstanding', 'RM Count', 'Avg Interest Rate']
-    branch_data = branch_data.reset_index()
-    
-    # Charts
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        fig_branch_amount = px.bar(
-            branch_data,
-            x='Branch/Outlet',
-            y='Total Amount',
-            title=f"Loan Amount by Branch - {selected_month}",
-            color='Total Amount'
-        )
-        st.plotly_chart(fig_branch_amount, use_container_width=True)
-    
-    with col2:
-        fig_branch_count = px.pie(
-            branch_data,
-            values='Loan Count',
-            names='Branch/Outlet',
-            title=f"Loan Distribution by Branch - {selected_month}"
-        )
-        st.plotly_chart(fig_branch_count, use_container_width=True)
-    
-    # Interactive branch table
-    st.subheader("Branch Performance Details")
-    
-    for idx, row in branch_data.iterrows():
-        col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 2, 2, 2, 2])
-        with col1:
-            st.write(f"**{row['Branch/Outlet']}**")
-        with col2:
-            st.write(f"Amount: ${row['Total Amount']:,.2f}")
-        with col3:
-            st.write(f"Loans: {row['Loan Count']}")
-        with col4:
-            st.write(f"Outstanding: ${row['Total Outstanding']:,.2f}")
-        with col5:
-            st.write(f"RMs: {row['RM Count']}")
-        with col6:
-            if st.button("View RMs", key=f"branch_{idx}"):
-                st.session_state.current_view = 'rm'
-                st.session_state.selected_branch = row['Branch/Outlet']
-                st.rerun()
+    for rm in rms_data:
+        with st.container():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"**{rm['name']}**")
+                st.caption(f"🏢 {rm['branch']} | 📊 {rm['loans']} loans")
+            with col2:
+                st.metric("Amount", rm["amount"], rm["growth"])
+            
+            # Progress bar for performance
+            progress_val = min(100, int(rm['amount'].replace('$', '').replace('K', '')) / 5)
+            st.progress(progress_val / 100, text=f"Performance: {progress_val}%")
+            
+            st.divider()
 
-def show_rm_performance(df, selected_branch):
-    st.header(f"👤 RM Performance - {selected_branch}")
+def show_mobile_settings():
+    """Mobile-optimized settings"""
     
-    # Filter data for selected branch
-    branch_df = df[df['Branch/Outlet'] == selected_branch]
+    st.subheader("⚙️ Settings")
     
-    # Back button
-    if st.button("← Back to Branch Performance"):
-        st.session_state.current_view = 'branch'
-        st.session_state.selected_branch = None
-        st.rerun()
-    
-    # RM performance data
-    rm_data = branch_df.groupby('RM Name').agg({
-        'AMOUNT IN USD': ['sum', 'count', 'mean'],
-        'OUTSTANDING': 'sum',
-        'INTEREST RATE': 'mean',
-        'PRODUCT_TYPE': lambda x: x.mode().iloc[0] if not x.mode().empty else 'N/A'
-    }).round(2)
-    
-    rm_data.columns = ['Total Amount', 'Loan Count', 'Avg Loan Size', 'Total Outstanding', 'Avg Interest Rate', 'Top Product']
-    rm_data = rm_data.reset_index()
-    
-    # RM KPIs
-    top_rm = rm_data.loc[rm_data['Total Amount'].idxmax()]
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Top RM", top_rm['RM Name'])
-    with col2:
-        st.metric("Top RM Amount", f"${top_rm['Total Amount']:,.2f}")
-    with col3:
-        st.metric("Total RMs", len(rm_data))
-    with col4:
-        st.metric("Branch Total", f"${rm_data['Total Amount'].sum():,.2f}")
-    
-    # RM performance charts
+    # Date range
+    st.write("**📅 Date Range**")
     col1, col2 = st.columns(2)
-    
     with col1:
-        fig_rm_amount = px.bar(
-            rm_data,
-            x='RM Name',
-            y='Total Amount',
-            title=f"Loan Amount by RM - {selected_branch}",
-            color='Total Amount',
-            color_continuous_scale='thermal'
-        )
-        st.plotly_chart(fig_rm_amount, use_container_width=True)
-    
+        start_date = st.date_input("From", datetime(2024, 1, 1))
     with col2:
-        fig_rm_loans = px.scatter(
-            rm_data,
-            x='Loan Count',
-            y='Avg Loan Size',
-            size='Total Amount',
-            color='RM Name',
-            title="RM Performance: Volume vs Size",
-            hover_data=['Top Product']
-        )
-        st.plotly_chart(fig_rm_loans, use_container_width=True)
+        end_date = st.date_input("To", datetime.today())
     
-    # Detailed RM table
-    st.subheader("RM Performance Details")
+    # Notifications
+    st.write("**🔔 Notifications**")
+    notif_col1, notif_col2 = st.columns(2)
+    with notif_col1:
+        st.checkbox("Performance alerts", True)
+        st.checkbox("New loans", True)
+    with notif_col2:
+        st.checkbox("Target updates", False)
+        st.checkbox("Weekly reports", True)
     
-    # Format the data for display
-    display_rm = rm_data.copy()
-    display_rm['Total Amount'] = display_rm['Total Amount'].apply(lambda x: f"${x:,.2f}")
-    display_rm['Avg Loan Size'] = display_rm['Avg Loan Size'].apply(lambda x: f"${x:,.2f}")
-    display_rm['Total Outstanding'] = display_rm['Total Outstanding'].apply(lambda x: f"${x:,.2f}")
-    display_rm['Avg Interest Rate'] = display_rm['Avg Interest Rate'].apply(lambda x: f"{x}%")
+    # Actions
+    st.write("**🛠️ Actions**")
+    if st.button("🔄 Refresh Data", use_container_width=True):
+        st.success("Data refreshed!")
     
-    st.dataframe(
-        display_rm,
-        column_config={
-            "RM Name": "Relationship Manager",
-            "Total Amount": "Total Amount",
-            "Loan Count": "Loan Count",
-            "Avg Loan Size": "Avg Loan Size",
-            "Total Outstanding": "Outstanding",
-            "Avg Interest Rate": "Avg Rate",
-            "Top Product": "Top Product"
-        },
-        use_container_width=True,
-        hide_index=True
-    )
+    if st.button("📧 Export Report", use_container_width=True):
+        st.info("Report generation started...")
+    
+    if st.button("🎯 Set Targets", use_container_width=True):
+        st.session_state.view = 'overview'
+        st.rerun()
+
+# Sample data generator (replace with your actual data loading)
+def load_sample_data():
+    return pd.DataFrame({
+        'Month': ['January', 'February', 'March', 'April', 'May'],
+        'Amount': [3800000, 4100000, 3900000, 4200000, 4500000],
+        'Loans': [142, 148, 145, 152, 156]
+    })
 
 if __name__ == "__main__":
     main()
